@@ -1,6 +1,6 @@
 # MojeWebovna CRM
 
-Jednoduché české webové CRM pro oslovování firem. React + Vite, bez účtu. Veřejný kód ani hotová stránka neobsahují zákaznické kontakty. Každý prohlížeč začíná s prázdnou evidencí, kterou lze naplnit ručně nebo importem vlastní JSON zálohy.
+Jednoduché české webové CRM pro oslovování firem. React + Vite + Supabase Auth a PostgreSQL. Veřejný kód ani hotová stránka neobsahují zákaznické kontakty. Přihlas se stejným e-mailem na počítači i mobilu. Jednorázový odkaz otevři na zařízení, které chceš přihlásit. Původní lokální kontakty přenese tlačítko **Přenést kontakty**, originál zůstane zachovaný.
 
 ## Používání
 
@@ -12,11 +12,13 @@ Jednoduché české webové CRM pro oslovování firem. React + Vite, bez účtu
 
 ## Důležité: kde jsou data
 
-Tato první verze je **local-first**: data zůstávají v localStorage konkrétního prohlížeče na konkrétní adrese. Nejsou na GitHubu ani na serveru a nesynchronizují se mezi zařízeními. Jiný prohlížeč, jiná adresa, jiný port nebo anonymní režim mají samostatná data. Změny potvrzuje aplikace až po úspěšném zápisu. Smazání dat prohlížeče může smazat CRM — pravidelně exportuj JSON.
+Data jsou v soukromé databázi Supabase. PostgreSQL Row Level Security vynucuje přístup jen k vlastnímu účtu (`auth.uid() = user_id`); anonymní přístup je zakázán. Změny se potvrzují po zápisu do databáze. Otevřená aplikace načítá změny každých 5 sekund a při návratu do okna. Každý zápis kontroluje revizi (compare-and-swap); při konfliktu se operace znovu aplikuje na aktuální dokument. Zastaralá editace je odmítnuta. Stejný opakovaný hovor se neduplikuje.
+
+Bez internetu lze vidět místní kopii po ověření relace, ale změny se offline neřadí do fronty. Neúspěšné uložení ponechá formulář otevřený. Zavření nebo obnovení stránky může ztratit rozepsaný formulář. Při výpadku po odeslání může být výsledek nejistý; zkontroluj historii. Pravidelně exportuj vlastní JSON zálohu. Přihlášení a kopie dat jsou v úložišti prohlížeče; nesdílej jeho profil s cizími lidmi. Odhlášení ukončí relaci na tomto zařízení a skryje CRM, ale nemaže místní zálohy ani původní kontakty. Jiný účet má oddělená data, nejde o týmové sdílení.
 
 Připomínky jsou viditelné uvnitř aplikace, **neposílají systémové notifikace, SMS ani e-maily**. Telefonní a e-mailový odkaz pouze otevře příslušnou aplikaci. CRM samo nikoho neoslovuje.
 
-Import kontroluje schéma a duplicitní ID. Sloučí kontakty, zachová novější metadata a spojí historii podle ID hovorů. Jde o ruční přenos záloh, nikoli o týmovou synchronizaci. Před importem stáhni aktuální zálohu. Při poškozených lokálních datech aplikace nic automaticky nepřepisuje a nabídne záchrannou kopii.
+Import kontroluje schéma a duplicitní ID. Sloučí kontakty, zachová novější metadata a spojí historii podle ID hovorů. Před importem stáhni aktuální zálohu. Importovaná data se uloží do přihlášeného účtu.
 
 ## O importovaných kontaktech
 
@@ -37,16 +39,16 @@ pnpm build
 node serve.mjs
 ```
 
-`pnpm dev` spouští vývojovou stránku `index-dev.html` na portu 5173. Produkční lokální balíček používá port 4173. Data z vývojového originu se automaticky nepřenášejí do produkčního; použij JSON export/import. Zdrojové moduly jsou vedle konfigurace v kořeni projektu. `pnpm build` vytvoří samostatný `index.html` s vloženým JS/CSS a CSP hashem; tento soubor je záměrně verzován, aby šel web publikovat přímo z větve main bez přístupových klíčů.
+`pnpm dev` spouští `index-dev.html` na portu 5173, lokální balíček používá port 4173. Přihlašovací odkaz se vrací na produkční adresu; místní přihlášení vyžaduje samostatně schválený redirect pro vývoj. Nesdílej produkční relace v testech. `pnpm build` vytvoří samostatný `index.html` s vloženým JS/CSS a CSP hashem; tento soubor je verzován pro publikování z main.
 
 ## GitHub a online verze
 
 Repozitář obsahuje pouze aplikaci, nikoli uživatelská data. GitHub Pages může publikovat připravený `index.html` z větve `main`, složky `/ (root)`. Po změně zdrojů spusť build a commitni i přegenerovaný `index.html`.
 
-Prázdný `seed.json` je záměrný: **kdo může stáhnout web, může číst jeho kód**. Nikdy sem nepřidávej kontakty, zálohy, soukromé poznámky ani přístupové klíče. Uživatelské záznamy se ukládají výhradně lokálně a při buildu se nečtou. Soubor `index.html` lze hostovat i na jiném statickém HTTPS hostingu. [Nastavení GitHub Pages](https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site).
+Prázdný `seed.json` je záměrný: **kdo může stáhnout web, může číst jeho kód**. Nikdy sem nepřidávej kontakty, zálohy, soukromé poznámky, hesla ani service-role klíče. Veřejný publishable klíč v `cloud.js` není administrátorský; ochranu vynucuje databáze. [Nastavení GitHub Pages](https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site).
 
-Pro sdílenou práci na mobilu a počítači bude další krok přihlášení + serverová databáze s pravidly přístupu. Statický hosting sám tuto synchronizaci nezajišťuje.
+`schema.sql` jednorázově zakládá tabulku, práva a RLS. Nespouštěj ho opakovaně jako obnovu. V Supabase nastav Site URL na přesnou HTTPS adresu CRM. Při změně projektu uprav `cloud.js`, CSP v `index-dev.html` a návrat přihlášení v `Auth.jsx`. Dokument má limit přibližně 4,5 MB; pro větší evidenci bude vhodné rozdělení na řádky kontaktů a hovorů. Tarif spravuje vlastník projektu.
 
 ## Testy
 
-`pnpm test` kontroluje seed, zápis a chronologii hovorů, platnost dat, uzavřené stavy, frontu připomínek, vyhledávání, archivaci, validaci a sloučení záloh, bezpečné odkazy a ochranu CSV před formulí. Primární průchod je ověřován také v reálném prohlížeči.
+`pnpm test` kontroluje seed, hovory, termíny, uzavřené stavy, vyhledávání, archivaci, zálohy, bezpečné odkazy a CSV, souběžný zápis, první vložení a síťové chyby. Cloudové unit testy používají simulovaný server a nenahrazují živý test RLS a dvou přihlášených zařízení.

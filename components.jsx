@@ -33,7 +33,7 @@ import {
 } from "./model";
 import { download } from "./store";
 
-export function Sidebar({ view, setView, onBackup, dueCount }) {
+export function Sidebar({ view, setView, onBackup, dueCount, syncStatus }) {
   return (
     <aside className="sidebar">
       <a
@@ -73,13 +73,13 @@ export function Sidebar({ view, setView, onBackup, dueCount }) {
           Záloha dat
         </button>
         <p>
-          Data se ukládají pouze
-          <br />v tomto prohlížeči.
+          Soukromá online evidence.
+          <br />Stejný účet na PC i mobilu.
           <br />
           Pravidelně si stáhni zálohu.
         </p>
         <span className="local-label">
-          <span /> Soukromě na tomto zařízení
+          <span /> {syncStatus}
         </span>
       </div>
     </aside>
@@ -327,6 +327,8 @@ function Modal({ children, onClose, className = "", label }) {
   );
 }
 export function ContactDrawer({ lead, initialTab, onClose, onUpdate }) {
+  const callAttempt = useRef(null);
+  const editRevision = useRef(lead.updatedAt);
   const [tab, setTab] = useState(initialTab);
   const [dirty, setDirty] = useState(false);
   const [error, setError] = useState("");
@@ -343,6 +345,7 @@ export function ContactDrawer({ lead, initialTab, onClose, onUpdate }) {
       setDirty(false);
       setError("");
       setTab(t);
+      editRevision.current = lead.updatedAt;
     }
   };
   const submit = async (e) => {
@@ -350,11 +353,19 @@ export function ContactDrawer({ lead, initialTab, onClose, onUpdate }) {
     setBusy(true);
     setError("");
     const f = Object.fromEntries(new FormData(e.currentTarget));
+    if (tab === 'call') {
+      const fingerprint = JSON.stringify(f);
+      if (callAttempt.current?.fingerprint !== fingerprint)
+        callAttempt.current = { fingerprint, id: crypto.randomUUID() };
+      f.id = callAttempt.current.id;
+    }
     try {
       if (tab === "call") recordCall(lead, f);
       else if (!f.name.trim()) throw Error("Vyplň název firmy.");
-      const ok = await onUpdate((current) =>
-        tab === "call"
+      const ok = await onUpdate((current) => {
+        if (tab === 'edit' && current.updatedAt !== editRevision.current)
+          throw Error('Kontakt mezitím změnilo jiné zařízení. Zkopíruj rozepsané údaje a znovu otevři aktuální kontakt.');
+        return tab === "call"
           ? recordCall(current, f)
           : {
               ...current,
@@ -367,14 +378,14 @@ export function ContactDrawer({ lead, initialTab, onClose, onUpdate }) {
               note: f.note.trim(),
               source: f.source.trim(),
               updatedAt: new Date().toISOString(),
-            },
-      );
+            };
+      });
       if (ok) {
         setDirty(false);
         onClose();
       } else
         setError(
-          "Uložení se nezdařilo. Rozepsané údaje zůstaly zde. Zkontroluj dostupné místo a oprávnění úložiště.",
+          "Uložení nebylo potvrzené. Rozepsané údaje zůstaly zde. Zkontroluj připojení a případné změny z jiného zařízení.",
         );
     } catch (err) {
       setError(err.message);
@@ -667,6 +678,7 @@ function ContactFields({ lead = {} }) {
   );
 }
 export function NewContact({ onClose, onAdd }) {
+  const [contactId] = useState(() => crypto.randomUUID());
   const [dirty, setDirty] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -692,7 +704,7 @@ export function NewContact({ onClose, onAdd }) {
           const ok = await onAdd({
             ...f,
             name: f.name.trim(),
-            id: crypto.randomUUID(),
+            id: contactId,
             research: "",
             calls: [],
             status: "Nevoláno",
@@ -743,8 +755,8 @@ export function BackupDialog({ data, onClose, onImport }) {
       <Database size={28} className="accent" />
       <h2>Záloha dat</h2>
       <p className="muted">
-        Záznamy zůstávají v tomto prohlížeči. Smazáním dat prohlížeče o ně můžeš
-        přijít. JSON záloha obsahuje i celou historii hovorů.
+        Záznamy se ukládají do tvé soukromé databáze a synchronizují mezi zařízeními.
+        JSON záloha obsahuje i celou historii hovorů. Pravidelně si stáhni vlastní kopii.
       </p>
       <div className="backup-actions">
         <button

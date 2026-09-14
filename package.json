@@ -7,9 +7,10 @@
     "dev": "vite --host 127.0.0.1 --port 5173 --strictPort --open /index-dev.html",
     "build": "vite build && node build-release.mjs",
     "preview": "vite preview --host 127.0.0.1 --port 4173 --strictPort",
-    "test": "node --test model.test.mjs"
+    "test": "node --test model.test.mjs cloud.test.mjs"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.116.0",
     "lucide-react": "^0.468.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1"

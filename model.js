@@ -82,7 +82,10 @@ export function filterLeads(
           : 0,
   );
 }
-export function recordCall(lead, { at, status, note, nextAt }) {
+export function recordCall(lead, { at, status, note, nextAt, id }) {
+  if (id && lead.calls.some(c => c.id === id)) return lead;
+  if (lead.archived || lead.status === 'Nekontaktovat')
+    throw Error('Kontakt je archivovaný nebo označený Nekontaktovat. Hovor nebyl přidán.');
   if (
     !at ||
     !Number.isFinite(Date.parse(at)) ||
@@ -98,7 +101,7 @@ export function recordCall(lead, { at, status, note, nextAt }) {
   )
     throw Error("Další kontakt musí být později než tento hovor.");
   const call = {
-    id: crypto.randomUUID(),
+    id: id || crypto.randomUUID(),
     at: new Date(at).toISOString(),
     status,
     note: note.trim(),
