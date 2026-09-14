@@ -794,6 +794,13 @@ export function BackupDialog({ data, onClose, onImport }) {
           onChange={loadFile}
         />
       </label>
+      <details>
+        <summary style={{cursor:'pointer',fontSize:13,marginBottom:12}}>Nebo vložit zálohu jako text</summary>
+        <form onSubmit={e=>{e.preventDefault();setError('');setPending(null);try {const raw=new FormData(e.currentTarget).get('backupText');if(raw.length>20*1024*1024)throw Error('Záloha je příliš velká.');setPending(validateBackup(JSON.parse(raw)));}catch(err){setError(err instanceof SyntaxError?'Text není platná JSON záloha.':err.message)}}}>
+          <label>Obsah JSON zálohy<textarea name="backupText" aria-label="Obsah JSON zálohy" rows={4} required placeholder="Vlož celý obsah své zálohy…"/></label>
+          <button className="button" type="submit">Načíst vloženou zálohu</button>
+        </form>
+      </details>
       {pending && (
         <div className="notice">
           <p>
